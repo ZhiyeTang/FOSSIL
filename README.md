@@ -1,8 +1,6 @@
-# Logistic Matrix Factorization
+# Fusing Item Similarity Models with Self-Attention Networks
 
-> This is a self-implemented repository for the paper **[Logistic matrix factorization for implicit feedback data](http://web.stanford.edu/~rezab/nips2014workshop/submits/logmat.pdf)**.
-
-Moreover, I've implemented the log confidence function besides linear confidence function.
+> This is a self-implemented repository for the paper **[FISSA: Fusing Item Similarity Models with Self-Attention Networks for Sequential Recommendation](http://csse.szu.edu.cn/staff/panwk/publications/Conference-RecSys-20-FISSA.pdf)**.
 
 **Requirements**
 
