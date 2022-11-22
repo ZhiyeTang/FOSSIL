@@ -5,9 +5,9 @@
 **Requirements**
 
 ```
-Python                    3.8.13
-NumPy                     1.23.1
-PyTorch                   1.10.2
+Python                    3.8.15
+NumPy                     1.23.4
+PyTorch                   1.13.0
 ```
 
 The code runs well with these requirements. While the code is simple, I believe it will also run well with some higher or lower versions of these packages.
@@ -21,3 +21,7 @@ python entry.py
 ```
 
 then everything goes well.
+
+---
+
+# **WARNING: This Repo is Still Implementing Now.**
