@@ -1,0 +1,17 @@
+{
+    "epochs": 500,
+    "T": 25,
+    "user_num": 22748,
+    "item_num": 11146,
+    "algorithm": {
+        "name": "Fossil",
+        "d": 20,
+        "UserNum": 21946,
+        "ItemNum": 11146,
+        "L": 3,
+        "K": 6,
+
+        "alpha": 0.01,
+        "gamma": 0.01
+    }
+}

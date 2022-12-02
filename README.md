@@ -25,3 +25,5 @@ then everything goes well.
 ---
 
 # **WARNING: This Repo is Still Implementing Now.**
+
+Algorithm `Fossil` has been implemented.
