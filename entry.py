@@ -11,6 +11,7 @@ class Runner:
     def __init__(self, config):
         self.config = config
         self.epochs = config["epochs"]
+        self.eval_inter = config["eval_inter"]
         Algorithm_Class = importlib.import_module(
             "algorithm."+config["algorithm"]["name"])
         self.algorithm = Algorithm_Class.Algorithm(config["algorithm"])
@@ -83,29 +84,25 @@ class Runner:
         for step in range(self.epochs):
             # train
             for user_id in range(self.train_data.shape[0]):
-                neg_idx = np.random.randint(100)
-                pos_idx = np.random.randint(
-                    config["algorithm"]["L"],
-                    (self.train_data[user_id, :] != -1).sum()
-                )
+                min_len = self.config["algorithm"]["L"]
+                max_len = (self.train_data[user_id, :] != -1).sum()
+                train_data = self.train_data[user_id, :max_len]
+                neg_idx = np.random.randint(low=100, size=[max_len-min_len])
                 self.algorithm.train(
                     user_id,
-                    self.train_data[user_id, :],
+                    train_data[:-1],
+                    train_data[min_len:],
                     self.nega_data[user_id, neg_idx],
-                    pos_idx,
                 )
-            if step % 10 == 9:
+            if step % self.eval_inter == self.eval_inter - 1:
                 RecK = self.algorithm.eval(
                     self.train_data,
                     self.valid_data,
-                    # user_id,
-                    # self.train_data[user_id, :],
-                    # self.nega_data[user_id, neg_idx],
-                    # pos_idx,
+                    self.nega_data,
                 )
                 self.train_trace.append(RecK)
                 print(
-                    "Recall@K[epoch{}]: {:.8}%".format(str(step+1).zfill(3), RecK))
+                    "Recall@K[epoch{}]: {:.8}%".format(str(step+1).zfill(3), RecK * 100))
         self.save()
 
     def save(self):
