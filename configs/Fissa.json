@@ -1,18 +1,24 @@
 {
-    "epochs": 1000,
+    "epochs": 500,
     "eval_inter": 1,
     "T": 25,
     "user_num": 22748,
     "item_num": 11146,
     "algorithm": {
         "name": "Fissa",
-        "d": 20,
         "UserNum": 21946,
         "ItemNum": 11146,
-        "L": 1,
-        "K": 6,
+        "MaxLen": 25,
 
-        "alpha": 0.01,
-        "gamma": 0.01
+        "DropoutRate": 0.5,
+        "UnitNum": 50,
+        "BlockNum": 1,
+        "HeadNum": 1,
+
+        "device": "cuda:0",
+        "lr": 0.001,
+
+        "L": 1,
+        "K": 10
     }
 }
