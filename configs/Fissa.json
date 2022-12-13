@@ -8,7 +8,7 @@
         "name": "Fissa",
         "UserNum": 21946,
         "ItemNum": 11146,
-        "MaxLen": 25,
+        "MaxLen": 50,
 
         "DropoutRate": 0.5,
         "UnitNum": 50,

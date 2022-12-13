@@ -4,7 +4,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 
-config = json.load(open("configs/Fossil.json"))
+config = json.load(open("configs/Fissa.json"))
 
 
 class Runner:
@@ -92,7 +92,7 @@ class Runner:
                     user_id,
                     train_data[:-1],
                     train_data[min_len:],
-                    self.nega_data[user_id, neg_idx],
+                    self.nega_data[user_id, :],
                 )
             if step % self.eval_inter == self.eval_inter - 1:
                 RecK = self.algorithm.eval(

@@ -26,6 +26,8 @@ class Algorithm:
 
         # Using long term knowledge and short term knowledge to estimate scores of positive item
         # and negative item.
+        neg_idx = np.random.randint(low=100, size=len(pos_items))
+        neg_items = neg_items[neg_idx]
         for idx in range(len(pos_items)):
             t = self.L + idx
             user_items_t = user_items[:t]

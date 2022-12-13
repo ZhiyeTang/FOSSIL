@@ -8,7 +8,7 @@ def get_variable(shape: list, *params, initializer="xavier",):
 
     out = torch.empty(shape)
     if initializer == "xavier":
-        if not params:
+        if params:
             out = nn.init.xavier_uniform_(out, params[0])
         else:
             out = nn.init.xavier_uniform_(out)
@@ -45,7 +45,6 @@ class SelfAttentionBlock(nn.Module):
             get_variable([num_inputs, num_units]),
             requires_grad=True,
         ).to(device)
-        self.softmax = nn.Softmax().to(device)
         self.dropout_1 = nn.Dropout(self.dropout_rate).to(device)
         self.dropout_2 = nn.Dropout(self.dropout_rate).to(device)
 
@@ -58,11 +57,11 @@ class SelfAttentionBlock(nn.Module):
         Qx = self.Q @ x
         Kx = self.K @ x
         Vx = self.V @ x
-        Qh = torch.concat(torch.split(Qx, self.num_heads, dim=2), dim=0)
-        Kh = torch.concat(torch.split(Kx, self.num_heads, dim=2), dim=0)
-        Vh = torch.concat(torch.split(Vx, self.num_heads, dim=2), dim=0)
-
+        Qh = torch.concat(torch.chunk(Qx, self.num_heads, dim=2), dim=0)
+        Kh = torch.concat(torch.chunk(Kx, self.num_heads, dim=2), dim=0)
+        Vh = torch.concat(torch.chunk(Vx, self.num_heads, dim=2), dim=0)
         outputs = torch.matmul(Qh, Kh.transpose(1, 2)) / (Kh.shape[-1] ** 0.5)
+
         tril = torch.tril(torch.ones_like(outputs[0, :, :]))
         casuality_mask = torch.tile(torch.unsqueeze(tril, 0), [
                                     outputs.shape[0], 1, 1])
@@ -73,23 +72,20 @@ class SelfAttentionBlock(nn.Module):
             padding_mask, [self.num_heads, 1, self.Q.shape[1]]).transpose(1, 2)
         outputs = torch.where(torch.eq(key_mask, 0),
                               torch.ones_like(outputs)*(-2**32+1), outputs)
-
-        outputs = self.softmax(outputs)
+        outputs = F.softmax(outputs, dim=-1)
 
         query_mask = torch.tile(padding_mask, [self.num_heads, 1, x.shape[1]])
         outputs *= query_mask
-
         outputs = self.dropout_1(outputs)
-        attention = torch.mean(torch.stack(torch.split(
-            outputs[:, -1], self.num_heads, dim=0), dim=0), dim=0)
 
         outputs = torch.matmul(outputs, Vh)
-        outputs = torch.concat(torch.split(
+        outputs = torch.concat(torch.chunk(
             outputs, self.num_heads, dim=0), dim=-1)
         outputs = self.dropout_2(outputs)
+        
         outputs += x
 
-        return outputs, attention
+        return outputs
 
 
 class LocationBasedAttentionBlock(nn.Module):
@@ -107,10 +103,11 @@ class LocationBasedAttentionBlock(nn.Module):
         self.num_heads = num_heads
         self.dropout_rate = dropout_rate
 
-        self.Q = nn.Parameter(
-            get_variable([1, num_inputs, num_units]),
+        weight = nn.Parameter(
+            get_variable([1, num_units]),
             requires_grad=True,
         ).to(device)
+        self.Q = torch.tile(weight.unsqueeze(0), [num_inputs, 1, 1])
         self.K = nn.Parameter(
             get_variable([num_inputs, num_units]),
             requires_grad=True,
@@ -119,7 +116,6 @@ class LocationBasedAttentionBlock(nn.Module):
             get_variable([num_inputs, num_units]),
             requires_grad=True,
         ).to(device)
-        self.softmax = nn.Softmax().to(device)
         self.dropout_1 = nn.Dropout(self.dropout_rate).to(device)
         self.dropout_2 = nn.Dropout(self.dropout_rate).to(device)
 
@@ -132,10 +128,9 @@ class LocationBasedAttentionBlock(nn.Module):
         Qx = self.Q @ x
         Kx = self.K @ x
         Vx = self.V @ x
-        Qh = torch.concat(torch.split(Qx, self.num_heads, dim=2), dim=0)
-        Kh = torch.concat(torch.split(Kx, self.num_heads, dim=2), dim=0)
-        Vh = torch.concat(torch.split(Vx, self.num_heads, dim=2), dim=0)
-
+        Qh = torch.concat(torch.chunk(Qx, self.num_heads, dim=2), dim=0)
+        Kh = torch.concat(torch.chunk(Kx, self.num_heads, dim=2), dim=0)
+        Vh = torch.concat(torch.chunk(Vx, self.num_heads, dim=2), dim=0)
         outputs = torch.matmul(Qh, Kh.transpose(1, 2))
 
         key_mask = torch.tile(
@@ -143,17 +138,14 @@ class LocationBasedAttentionBlock(nn.Module):
         outputs = torch.where(torch.eq(key_mask, 0),
                               torch.ones_like(outputs)*(-2**32+1), outputs)
 
-        outputs = self.softmax(outputs)
-
+        outputs = F.softmax(outputs, dim=-1)
         outputs = self.dropout_1(outputs)
-        attention = torch.split(outputs[:, -1], self.num_heads, dim=0)
-
         outputs = torch.matmul(outputs, Vh)
-        outputs = torch.concat(torch.split(
+        outputs = torch.concat(torch.chunk(
             outputs, self.num_heads, dim=0), dim=-1)
         outputs = self.dropout_2(outputs)
 
-        return outputs, attention
+        return outputs
 
 
 class FeedForward(nn.Module):
@@ -215,7 +207,7 @@ class ItemSimilarityGatingBlock(nn.Module):
         logits = self.dropout_2(logits)
         logits = logits.reshape([-1, embeds_2.shape[1], 1])
 
-        outputs = F.sigmoid(logits)
+        outputs = torch.sigmoid(logits)
 
         return outputs
 
@@ -232,7 +224,7 @@ class FissaNetwork(nn.Module):
         dropout_rate: float,
         device: torch.device,
     ):
-        super(FissaNetwork).__init__()
+        super(FissaNetwork, self).__init__()
 
         self.num_items = num_items
         self.max_len = max_len
@@ -248,8 +240,8 @@ class FissaNetwork(nn.Module):
             get_variable([self.max_len, self.num_units]),
             requires_grad=True,
         ).to(device)
-        self.inputs_dropout = nn.Dropout(p=dropout_rate)
-        self.inputs_layer_norm = nn.LayerNorm(num_units, eps=1e-8)
+        self.inputs_dropout = nn.Dropout(p=dropout_rate).to(device)
+        self.inputs_layer_norm = nn.LayerNorm(num_units, eps=1e-8).to(device)
 
         self.SABs = [
             {
@@ -263,7 +255,7 @@ class FissaNetwork(nn.Module):
                 "LN1": nn.LayerNorm(
                     num_units,
                     eps=1e-8,
-                ),
+                ).to(device),
                 "FF": FeedForward(
                     num_inputs=self.num_units,
                     num_units=self.num_units,
@@ -273,10 +265,10 @@ class FissaNetwork(nn.Module):
                 "LN2": nn.LayerNorm(
                     num_units,
                     eps=1e-8,
-                ),
+                ).to(device),
             }
         ] * self.num_blocks
-        self.local_dropout = nn.Dropout(p=dropout_rate)
+        self.local_dropout = nn.Dropout(p=dropout_rate).to(device)
 
         self.LBAB = {
             "LBAB": LocationBasedAttentionBlock(
@@ -289,9 +281,9 @@ class FissaNetwork(nn.Module):
             "LN1": nn.LayerNorm(
                 num_units,
                 eps=1e-8,
-            ),
+            ).to(device),
             "FF": FeedForward(
-                num_inputs=self.num_units,
+                num_inputs=1,
                 num_units=self.num_units,
                 dropout_rate=dropout_rate,
                 device=device
@@ -299,14 +291,14 @@ class FissaNetwork(nn.Module):
             "LN2": nn.LayerNorm(
                 num_units,
                 eps=1e-8,
-            ),
+            ).to(device),
         }
-        self.global_dropout = nn.Dropout(p=dropout_rate)
+        self.global_dropout = nn.Dropout(p=dropout_rate).to(device)
 
         self.gated_weight = nn.Parameter(
             get_variable(
                 [self.num_units*3, 1],
-                [0.0, (2 / (3 * self.num_units + 1)) ** 0.5],
+                0.0, (2 / (3 * self.num_units + 1)) ** 0.5,
                 initializer="trunc_norm",
             ),
             requires_grad=True,
@@ -314,7 +306,7 @@ class FissaNetwork(nn.Module):
         self.gated_bias = nn.Parameter(
             get_variable(
                 [1, 1],
-                [0.0, (2 / (2 * self.num_units + 1)) ** 0.5],
+                0.0, (2 / (2 * self.num_units + 1)) ** 0.5,
                 initializer="trunc_norm",
             ),
             requires_grad=True,
@@ -322,7 +314,7 @@ class FissaNetwork(nn.Module):
         self.ISGB = ItemSimilarityGatingBlock(
             self.num_units, dropout_rate, device)
 
-        self.outputs_layer_norm = nn.LayerNorm(num_units, eps=1e-8)
+        self.outputs_layer_norm = nn.LayerNorm(num_units, eps=1e-8).to(device)
 
     def forward(
         self,
@@ -332,9 +324,8 @@ class FissaNetwork(nn.Module):
         neg_items: torch.Tensor,
     ):
 
-        item_embeds = self.item_embedding.index_select(0, user_items)
-        pos_embeds = self.pos_embedding.index_select(
-            0, torch.arange(self.max_len))
+        item_embeds = self.item_embedding[user_items, :]
+        pos_embeds = self.pos_embedding[torch.arange(self.max_len), :]
 
         inputs = item_embeds + pos_embeds
         inputs = self.inputs_dropout(inputs)
@@ -345,7 +336,7 @@ class FissaNetwork(nn.Module):
         loc_embeds = inputs
         for _, block in enumerate(self.SABs):
 
-            loc_embeds, _ = block["SAB"].forward(loc_embeds, padding_mask)
+            loc_embeds = block["SAB"].forward(loc_embeds, padding_mask)
             loc_embeds = block["LN1"].forward(loc_embeds)
 
             loc_embeds = block["FF"].forward(loc_embeds)
@@ -359,8 +350,8 @@ class FissaNetwork(nn.Module):
         glo_embeds = self.LBAB["LN2"].forward(glo_embeds)
 
         # hybrid representation
-        positive_embeds = item_embeds.index_select(0, pos_items)
-        negative_embeds = item_embeds.index_select(0, neg_items)
+        positive_embeds = item_embeds[pos_items, :]
+        negative_embeds = item_embeds[neg_items, :]
 
         gated_value = self.ISGB.forward(
             torch.tile(glo_embeds, [2, self.max_len, 1]),
@@ -369,7 +360,7 @@ class FissaNetwork(nn.Module):
             self.gated_weight,
             self.gated_bias,
         )
-        gated_value = F.sigmoid(gated_value)
+        gated_value = torch.sigmoid(gated_value)
 
         tiled_loc_embeds = torch.tile(loc_embeds, [2, 1, 1])
         tiled_glo_embeds = torch.tile(glo_embeds, [2, 1, 1])
@@ -382,7 +373,7 @@ class FissaNetwork(nn.Module):
         outputs_positive = outputs[:user_items.shape[0]]
         outputs_negative = outputs[user_items.shape[0]:]
 
-        outputs = torch.concat(
+        outputs = torch.stack(
             [
                 torch.sum(outputs_positive*positive_embeds, -1),
                 torch.sum(outputs_negative*negative_embeds, -1),
@@ -399,10 +390,9 @@ class FissaNetwork(nn.Module):
         candidate_items: torch.Tensor,
     ):
 
-        item_embeds = self.item_embedding.index_select(0, user_items)
-        candidate_embeds = self.pos_embedding.index_select(0, candidate_items)
-        pos_embeds = self.pos_embedding.index_select(
-            0, torch.arange(self.max_len))
+        item_embeds = self.item_embedding[user_items, :]
+        candidate_embeds = self.pos_embedding[candidate_items, :]
+        pos_embeds = self.pos_embedding[torch.arange(self.max_len), :]
 
         inputs = item_embeds + pos_embeds
         inputs = self.inputs_dropout(inputs)
@@ -413,7 +403,7 @@ class FissaNetwork(nn.Module):
         loc_embeds = inputs
         for _, block in enumerate(self.SABs):
 
-            loc_embeds, _ = block["SAB"].forward(loc_embeds, padding_mask)
+            loc_embeds = block["SAB"].forward(loc_embeds, padding_mask)
             loc_embeds = block["LN1"].forward(loc_embeds)
 
             loc_embeds = block["FF"].forward(loc_embeds)
@@ -434,7 +424,7 @@ class FissaNetwork(nn.Module):
             self.gated_weight,
             self.gated_bias,
         )
-        gated_value = F.sigmoid(gated_value)
+        gated_value = torch.sigmoid(gated_value)
 
         tiled_loc_embeds = torch.tile(
             loc_embeds[:, -1, :].unsqueeze(1), [1, 101, 1])
@@ -480,28 +470,33 @@ class Algorithm:
 
     def train(self, user_id: int, user_items, pos_items, neg_items) -> None:
 
-        user_items_filled = -np.ones([self.MaxLen])
+        user_items_filled = -np.ones([self.MaxLen+1])
         user_items_filled[:len(user_items)] = user_items
-        user_items = np.tile(user_items_filled, [self.MaxLen, 1])
+        user_items = np.tile(user_items_filled[:-1], [self.MaxLen, 1])
         padding_mask = np.zeros_like(user_items)
         padding_mask[user_items!=-1] = 1
+        padding_mask = np.expand_dims(padding_mask, -1)
 
-        user_items = torch.as_tensor(user_items).to(self.device)
+        user_items = torch.as_tensor(user_items).to(self.device).long()
         padding_mask = torch.as_tensor(padding_mask).to(self.device)
-        pos_items = torch.as_tensor(pos_items).to(self.device)
-        neg_items = torch.as_tensor(neg_items).to(self.device)
+
+        pos_items = user_items_filled[1:]
+        pos_items = torch.as_tensor(pos_items).to(self.device).long()
+
+        neg_items = np.random.choice(neg_items, self.MaxLen)
+        neg_items = torch.as_tensor(neg_items).to(self.device).long()
 
         outputs = self.Network.forward(
-            user_items.unsqueeze(0),
-            padding_mask.unsqueeze(0),
-            pos_items.unsqueeze(0),
-            neg_items.unsqueeze(0),
+            user_items,
+            padding_mask,
+            pos_items,
+            neg_items,
         )
-        print(outputs.shape)
 
+        flag_exist = torch.ne(pos_items, -1)
         loss = torch.mean(
-            -torch.log(F.sigmoid(outputs[0]) + 1e-24)\
-            -torch.log(1 - F.sigmoid(outputs[1]) + 1e-24)
+            -torch.log(torch.sigmoid(outputs[0]) + 1e-24) * flag_exist \
+            -torch.log(1 - torch.sigmoid(outputs[1]) + 1e-24) * flag_exist
         )
         self.optimizer.zero_grad()
         loss.backward()
@@ -521,12 +516,12 @@ class Algorithm:
         Recall_at_K = 0.
         for user_id in range(self.UserNum):
             outputs = self.Network.inference(
-                user_items[user_id, :, :],
-                padding_mask[user_id, :, :],
-                candidate_items[user_id, :],
+                user_items[user_id, :, :].long(),
+                padding_mask[user_id, :, :].long(),
+                candidate_items[user_id, :].long(),
             )
 
-            R = outputs.detach_().to("cpu").numpy()
+            R = outputs.detach_().cpu().numpy()
             topK = np.argpartition(R, -self.K)[-self.K:]
             if 0 in topK:
                 Recall_at_K += 1
