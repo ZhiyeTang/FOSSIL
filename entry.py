@@ -83,7 +83,7 @@ class Runner:
     def train(self):
         for step in range(self.epochs):
             # train
-            for user_id in range(self.train_data.shape[0]):
+            for user_id in tqdm(range(self.train_data.shape[0])):
                 min_len = self.config["algorithm"]["L"]
                 max_len = (self.train_data[user_id, :] != -1).sum()
                 train_data = self.train_data[user_id, :max_len]
