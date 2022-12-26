@@ -4,7 +4,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 
-config = json.load(open("configs/Fissa.json"))
+config = json.load(open("configs/Fossil.json"))
 
 
 class Runner:
@@ -18,6 +18,7 @@ class Runner:
         self._data_preprocess(
             config["user_num"], config["item_num"], config["T"])
 
+        self.batch_size = config["batch_size"]
         self.train_trace = []
 
     def _data_preprocess(self, user_num, item_num, T):
@@ -83,16 +84,18 @@ class Runner:
     def train(self):
         for step in range(self.epochs):
             # train
-            for user_id in tqdm(range(self.train_data.shape[0])):
-                min_len = self.config["algorithm"]["L"]
-                max_len = (self.train_data[user_id, :] != -1).sum()
-                train_data = self.train_data[user_id, :max_len]
-                neg_idx = np.random.randint(low=100, size=[max_len-min_len])
+            # for user_ids in tqdm(range(self.train_data.shape[0])):
+            #     user_ids = np.asarray([user_ids])
+            shuffled_user_ids = np.random.permutation(
+                np.arange(self.train_data.shape[0]))
+            batch_time = self.train_data.shape[0] // self.batch_size + 1
+            for btt in tqdm(range(batch_time)):
+                user_ids = shuffled_user_ids[btt*self.batch_size: min(
+                    (btt+1)*self.batch_size, shuffled_user_ids.shape[0])]
                 self.algorithm.train(
-                    user_id,
-                    train_data[:-1],
-                    train_data[min_len:],
-                    self.nega_data[user_id, :],
+                    user_ids,
+                    self.train_data[user_ids, :],
+                    self.nega_data[user_ids, :],
                 )
             if step % self.eval_inter == self.eval_inter - 1:
                 RecK = self.algorithm.eval(

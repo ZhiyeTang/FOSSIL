@@ -1,6 +1,6 @@
 # Fusing Item Similarity Models with Self-Attention Networks
 
-> This is a self-implemented repository for the paper **[FISSA: Fusing Item Similarity Models with Self-Attention Networks for Sequential Recommendation](http://csse.szu.edu.cn/staff/panwk/publications/Conference-RecSys-20-FISSA.pdf)**.
+> This is a self-implemented repository for the paper **["Fusing Similarity Models with Markov Chains for Sparse Sequential Recommendation."](https://arxiv.org/pdf/1609.09152)**.
 
 **Requirements**
 
@@ -24,6 +24,10 @@ then everything goes well.
 
 ---
 
-# **WARNING: This Repo is Still Implementing Now.**
+**Results**
 
-Algorithm `Fossil` has been implemented.
+The algorithm results after 500 epochs' training is as below:
+
+![TrainRes](./fossil.jpg)
+
+![AccRes](./fossil_acc.jpg)

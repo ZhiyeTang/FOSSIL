@@ -22,12 +22,21 @@ class Algorithm:
 
         self.loss = 0.
 
-    def train(self, user_id: int, user_items: np.ndarray, pos_items: np.ndarray, neg_items: np.ndarray) -> None:
+    def train(self, user_id: np.ndarray, user_items: np.ndarray, neg_items: np.ndarray) -> None:
 
         # Using long term knowledge and short term knowledge to estimate scores of positive item
         # and negative item.
+        user_id = user_id[0]
+        user_items = user_items[0]
+        neg_items = neg_items[0]
+
+        T = (user_items != -1).sum()
+        whole_seq = user_items[:T]
+        user_items = whole_seq[:-1]
+        pos_items = whole_seq[self.L:T]
         neg_idx = np.random.randint(low=100, size=len(pos_items))
         neg_items = neg_items[neg_idx]
+        
         for idx in range(len(pos_items)):
             t = self.L + idx
             user_items_t = user_items[:t]
@@ -98,7 +107,7 @@ class Algorithm:
 
         valid_data = np.column_stack([valid_data, nega_data])
         T = (train_data != -1).sum(axis=1)
-        Recall_at_K = 0
+        Recall_at_K = np.zeros(train_data.shape[0])
         for user_id in range(self.UserNum):
             t = T[user_id]
             user_items = train_data[user_id, :t]
@@ -113,37 +122,9 @@ class Algorithm:
                 np.matmul(self.V[valid_data[user_id, :], :], U)
             topK = np.argpartition(R, -self.K)[-self.K:]
             if 0 in topK:
-                Recall_at_K += 1
+                Recall_at_K[user_id] = 1
 
-        return Recall_at_K / self.UserNum
-
-    # def eval(self, user_id: int, user_items: np.ndarray, neg_item: int, t: int) -> float:
-    #     pos_item = user_items[t]
-    #     user_items = user_items[:t]
-    #     longterm = np.zeros(self.d)
-    #     for i in range(t):
-    #         longterm += self.W[user_items[i], :]
-    #     longterm /= np.sqrt(t)
-
-    #     shortterm = np.zeros(self.d)
-    #     for l in range(self.L):
-    #         shortterm += (self.eta[l] + self.etaU[user_id, l]
-    #                       ) * self.W[user_items[- l - 1], :]
-
-    #     U = longterm + shortterm
-    #     R_pos = self.b[pos_item] + np.dot(U, self.V[pos_item, :])
-    #     R_neg = self.b[neg_item] + np.dot(U, self.V[neg_item, :])
-
-    #     reg = np.square(self.V[pos_item]).sum() + \
-    #         np.square(self.V[neg_item]).sum() + \
-    #         np.square(longterm * np.sqrt(t)).sum() + \
-    #         np.square(self.b[pos_item]) + \
-    #         np.square(self.b[neg_item]) + \
-    #         np.square(self.eta).sum() + \
-    #         np.square(self.etaU[user_id]).sum()
-
-    #     return -np.log(1 / (1 + np.exp(-np.clip((R_pos - R_neg), -10, 10)))).sum() + \
-    #         0.5 * self.alpha * reg
+        return Recall_at_K
 
     def save(self, path):
         np.savetxt(os.path.join(path, "V.txt"), self.V)

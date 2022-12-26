@@ -4,6 +4,7 @@
     "T": 25,
     "user_num": 22748,
     "item_num": 11146,
+    "batch_size": 1,
     "algorithm": {
         "name": "Fossil",
         "d": 20,
