@@ -1,4 +1,4 @@
-# Fusing Item Similarity Models with Self-Attention Networks
+# Fusing Similarity Models with Markov Chains for Sparse Sequential Recommendation (Fossil)
 
 > This is a self-implemented repository for the paper **["Fusing Similarity Models with Markov Chains for Sparse Sequential Recommendation."](https://arxiv.org/pdf/1609.09152)**.
 
